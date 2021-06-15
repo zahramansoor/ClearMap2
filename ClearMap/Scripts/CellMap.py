@@ -41,17 +41,19 @@ if __name__ == "__main__":
   from ClearMap.Environment import *  #analysis:ignore
   
   #directories and files
-  directory = '/home/ckirst/Programs/ClearMap2/ClearMap/Tests/Data/CellMap_Example/'    
-  
-  expression_raw      = 'Raw/Fos/Z<Z,4>.tif'           
-  expression_auto     = 'Autofluorescence/Auto/Z<Z,4>.tif'  
-  
+  directory = "/media/kepecs/Starosta_8T/2P_imaging/AA6-AK1a"    
+    
+  expression_raw      = 'AA6-AK1a_640/AA6-AK1a_640-stitched_T001_Z<Z,I>_C01.tif'            
+  expression_auto     = 'AA6-AK1a_561/original/AA6-AK1a_561-stitched_T001_Z<Z,I>_C01.tif'
+    
   ws = wsp.Workspace('CellMap', directory=directory);
   ws.update(raw=expression_raw, autofluorescence=expression_auto)
+  ws.debug = False
+    
+  resources_directory = settings.resources_path
+    
   ws.info()
-  
-  ws.debug = True
-  
+      
   resources_directory = settings.resources_path
   
   #%% Initialize alignment 
