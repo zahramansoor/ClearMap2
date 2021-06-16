@@ -30,20 +30,24 @@ __copyright__ = 'Copyright © 2020 by Christoph Kirst'
 __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
+#ClearMap path
+import sys
+sys.path.append('/home/kepecs/ClearMap2')
+
 if __name__ == "__main__":
      
-  #%%############################################################################
+  #%############################################################################
   ### Initialization 
-  ###############################################################################
+  ##############################################################################
   
-  #%% Initialize workspace
+  #% Initialize workspace
   
   from ClearMap.Environment import *  #analysis:ignore
   
   #directories and files
-  directory = "/media/kepecs/Starosta_8T/2P_imaging/AA6-AK1a"    
+  directory = "/home/kepecs/Documents/2P_imaging/AA6-AK1a"    
     
-  expression_raw      = 'AA6-AK1a_640/AA6-AK1a_640-stitched_T001_Z<Z,I>_C01.tif'            
+  expression_raw      = 'cells_test/AA6-AK1a_640-stitched_T001_Z<Z,I>_C01.tif'            
   expression_auto     = 'AA6-AK1a_561/original/AA6-AK1a_561-stitched_T001_Z<Z,I>_C01.tif'
     
   ws = wsp.Workspace('CellMap', directory=directory);
@@ -172,23 +176,25 @@ if __name__ == "__main__":
   
   cell_detection_parameter = cells.default_cell_detection_parameter.copy();
   cell_detection_parameter['illumination_correction'] = None;
-  cell_detection_parameter['background_correction'] = None;
+  cell_detection_parameter['background_correction'] = {"shape": (3,3), "form": "Disk", "save": None}; #default
   cell_detection_parameter['intensity_detection']['measure'] = ['source'];
-  cell_detection_parameter['shape_detection']['threshold'] = 500;
+  cell_detection_parameter['shape_detection']['threshold'] = 50;
+  # cell_detection_parameter["maxima_detection"]["threshold"] = 20
+  cell_detection_parameter['maxima_detection']['save'] = False #DO NOT SAVE MAXIMA WTF
   
-  io.delete_file(ws.filename('cells', postfix='maxima'))
-  cell_detection_parameter['maxima_detection']['save'] = ws.filename('cells', postfix='maxima')
+  # io.delete_file(ws.filename('cells', postfix='maxima'))
+  # cell_detection_parameter['maxima_detection']['save'] = ws.filename('cells', postfix='maxima')
   
   processing_parameter = cells.default_cell_detection_processing_parameter.copy();
   processing_parameter.update(
-      processes = None, # 'serial',
-      size_max = 20, #100, #35,
-      size_min = 11,# 30, #30,
+      processes = "serial", # 'serial', #multiple processes don't work on kepecs desktop
+      size_max = 25, #100, #35,
+      size_min = 12,# 30, #30,
       overlap  = 10, #32, #10,
       verbose = True
       )
   
-  cells.detect_cells(ws.filename('stitched'), ws.filename('cells', postfix='raw'),
+  cells.detect_cells(ws.source('raw'), ws.filename('cells', postfix='raw33_bk50'),
                      cell_detection_parameter=cell_detection_parameter, 
                      processing_parameter=processing_parameter)
   
@@ -204,7 +210,7 @@ if __name__ == "__main__":
   
   #%% Cell statistics
   
-  source = ws.source('cells', postfix='raw')
+  source = ws.source('cells', postfix='raw33_bk200')
   
   plt.figure(1); plt.clf();
   names = source.dtype.names;
@@ -222,7 +228,7 @@ if __name__ == "__main__":
       'size'   : (20,None)
       }
   
-  cells.filter_cells(source = ws.filename('cells', postfix='raw'), 
+  cells.filter_cells(source = ws.filename('cells', postfix='raw33_bk50'), 
                      sink = ws.filename('cells', postfix='filtered'), 
                      thresholds=thresholds);
   
