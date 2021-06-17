@@ -176,25 +176,27 @@ if __name__ == "__main__":
   
   cell_detection_parameter = cells.default_cell_detection_parameter.copy();
   cell_detection_parameter['illumination_correction'] = None;
-  cell_detection_parameter['background_correction'] = {"shape": (3,3), "form": "Disk", "save": None}; #default
+  cell_detection_parameter['background_correction'] = {"shape": (15,15), "form": "Disk"};
   cell_detection_parameter['intensity_detection']['measure'] = ['source'];
-  cell_detection_parameter['shape_detection']['threshold'] = 50;
+  cell_detection_parameter['shape_detection']['threshold'] = 150;
   # cell_detection_parameter["maxima_detection"]["threshold"] = 20
   cell_detection_parameter['maxima_detection']['save'] = False #DO NOT SAVE MAXIMA WTF
   
   # io.delete_file(ws.filename('cells', postfix='maxima'))
-  # cell_detection_parameter['maxima_detection']['save'] = ws.filename('cells', postfix='maxima')
+  cell_detection_parameter['background_correction']['save'] = ws.filename("cells", postfix="background")
   
   processing_parameter = cells.default_cell_detection_processing_parameter.copy();
   processing_parameter.update(
-      processes = "serial", # 'serial', #multiple processes don't work on kepecs desktop
-      size_max = 25, #100, #35,
-      size_min = 12,# 30, #30,
-      overlap  = 10, #32, #10,
+      processes = 1, # 'serial', #multiple processes don't work on kepecs desktop bc of memory
+      size_max = 10, #100, #35,
+      size_min = 5,# 30, #30,
+      optimization = False,
+      optimization_fix = None,
+      overlap  = 3, #32, #10,
       verbose = True
       )
   
-  cells.detect_cells(ws.source('raw'), ws.filename('cells', postfix='raw33_bk50'),
+  cells.detect_cells(ws.source('raw'), ws.filename('cells', postfix='raw_bk5_shp150'),
                      cell_detection_parameter=cell_detection_parameter, 
                      processing_parameter=processing_parameter)
   
@@ -228,7 +230,7 @@ if __name__ == "__main__":
       'size'   : (20,None)
       }
   
-  cells.filter_cells(source = ws.filename('cells', postfix='raw33_bk50'), 
+  cells.filter_cells(source = ws.filename('cells', postfix='raw_bk5_shp150'), 
                      sink = ws.filename('cells', postfix='filtered'), 
                      thresholds=thresholds);
   

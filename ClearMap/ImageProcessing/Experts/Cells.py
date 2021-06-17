@@ -17,7 +17,7 @@ __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
       
 
-import numpy as np
+import numpy as np, sys
 import tempfile as tmpf 
 import gc            
 
@@ -112,7 +112,8 @@ See :func:`ClearMap.ParallelProcessing.BlockProcessing.process` for details."""
 ### Cell detection
 ###############################################################################
                    
-def detect_cells(source, sink = None, cell_detection_parameter = default_cell_detection_parameter, processing_parameter = default_cell_detection_processing_parameter):
+def detect_cells(source, sink = None, cell_detection_parameter = default_cell_detection_parameter, 
+                 processing_parameter = default_cell_detection_processing_parameter):
   """Cell detection pipeline.
   
   Arguments
@@ -314,7 +315,11 @@ def detect_cells(source, sink = None, cell_detection_parameter = default_cell_de
         
   cell_detection_parameter.update(verbose=processing_parameter.get('verbose', False));
   
-  results, blocks = bp.process(detect_cells_block, source, sink=None, function_type='block', return_result=True, return_blocks=True, parameter=cell_detection_parameter, **processing_parameter)                   
+  #zmd 
+  sys.stdout.write("Running process code...\n\n\n")
+  results, blocks = bp.process(detect_cells_block, source, sink=None, function_type='block', 
+                               return_result=True, return_blocks=True, parameter=cell_detection_parameter, 
+                               **processing_parameter)                   
   
   #merge results
   results = np.vstack([np.hstack(r) for r in results])
@@ -403,7 +408,7 @@ def detect_cells_block(source, parameter = default_cell_detection_parameter):
     
     if save:
       save = io.as_source(save);
-      save[base_slicing] = background[valid_slicing];
+      save[base_slicing] = background[valid_slicing].astype("uint8"); #zmd added dtype
     
     if verbose:
       timer.print_elapsed_time('Illumination correction');                          
@@ -441,7 +446,6 @@ def detect_cells_block(source, parameter = default_cell_detection_parameter):
 
   if 'equalized' in measure_to_array:
     measure_to_array['equalized'] = equalized;
-  
     
   #DoG filter
   parameter_dog_filter = parameter.get('dog_filter', None);
@@ -469,8 +473,7 @@ def detect_cells_block(source, parameter = default_cell_detection_parameter):
   
   if 'dog' in measure_to_array:
     measure_to_array['dog'] = dog;
-  
-  
+    
   #Maxima detection
   parameter_maxima     = parameter.get('maxima_detection', None);
   parameter_shape      = parameter.get('shape_detection', None);
