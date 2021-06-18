@@ -76,6 +76,8 @@ or structures.
 Please refer to our [documentation](https://christophkirst.github.io/ClearMap2Documentation)
 on how to [install](https://christophkirst.github.io/ClearMap2Documentation/html/installation.html) ClearMap.
 
+## NOTE: for Linux users, C++ compilation requires gcc & g++ version < 9 (7 works)
+
 [Tutorials](https://christophkirst.github.io/ClearMap2Documentation/html/usage.html)
 ====================================================================================
 

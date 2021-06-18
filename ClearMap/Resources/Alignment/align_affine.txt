@@ -12,6 +12,7 @@
 (MovingInternalImagePixelType "float")
 (MovingImageDimension 3)
 
+
 //Components
 (Registration "MultiResolutionRegistration")
 (FixedImagePyramid "FixedSmoothingImagePyramid")
@@ -33,6 +34,7 @@
 
 (WriteTransformParametersEachIteration "false")
 (WriteResultImage "true")
+(ResultImageFormat "tif") // zmd added
 (CompressResultImage "true")
 (WriteResultImageAfterEachResolution "false") 
 (ShowExactMetricValue "false")

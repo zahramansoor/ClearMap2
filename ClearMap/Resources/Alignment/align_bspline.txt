@@ -32,6 +32,7 @@
 
 (WriteTransformParametersEachIteration "false")
 (WriteResultImage "true")
+(ResultImageFormat "tif") // zmd added
 (CompressResultImage "false")
 (WriteResultImageAfterEachResolution "false")
 (ShowExactMetricValue "false")

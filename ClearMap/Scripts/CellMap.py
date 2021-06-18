@@ -32,7 +32,7 @@ __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 #ClearMap path
 import sys
-sys.path.append('/home/kepecs/ClearMap2')
+sys.path.append('/home/kepecs/python/ClearMap2/')
 
 if __name__ == "__main__":
      
@@ -47,7 +47,7 @@ if __name__ == "__main__":
   #directories and files
   directory = "/home/kepecs/Documents/2P_imaging/AA6-AK1a"    
     
-  expression_raw      = 'cells_test/AA6-AK1a_640-stitched_T001_Z<Z,I>_C01.tif'            
+  expression_raw      = 'AA6-AK1a_640/AA6-AK1a_640-stitched_T001_Z<Z,I>_C01.tif'            
   expression_auto     = 'AA6-AK1a_561/original/AA6-AK1a_561-stitched_T001_Z<Z,I>_C01.tif'
     
   ws = wsp.Workspace('CellMap', directory=directory);
@@ -64,7 +64,7 @@ if __name__ == "__main__":
   
   #init atals and reference files
   annotation_file, reference_file, distance_file=ano.prepare_annotation_files(
-      slicing=(slice(None),slice(None),slice(0,256)), orientation=(1,-2,3),
+      slicing=(slice(None),slice(None),slice(0,256)), orientation=(1,2,3),
       overwrite=False, verbose=True);
   
   #alignment parameter files    
@@ -92,27 +92,27 @@ if __name__ == "__main__":
   #%% Resample 
              
   resample_parameter = {
-      "source_resolution" : (4.0625, 4.0625, 3),
-      "sink_resolution"   : (25,25,25),
-      "processes" : 4,
-      "verbose" : True,             
-      };
-  
-  io.delete_file(ws.filename('resampled'))
-  
-  res.resample(ws.filename('stitched'), sink=ws.filename('resampled'), **resample_parameter)
-  
+        "source_resolution" : (1.625,1.625,10), #z step might be 5 because less z planes
+        "sink_resolution"   : (25,25,25),
+        "orientation": (-3, 2, 1), #inverts old z (dorsal -> ventral) and flips x and z
+        "processes" : None,
+        "verbose" : True,             
+        };
+    
+  res.resample(ws.source('raw'), sink=ws.filename('resampled'), **resample_parameter)
+
   #%%
   p3d.plot(ws.filename('resampled'))
   
   #%% Resample autofluorescence
       
   resample_parameter_auto = {
-      "source_resolution" : (5,5,6),
-      "sink_resolution"   : (25,25,25),
-      "processes" : 4,
-      "verbose" : True,                
-      };    
+        "source_resolution" : (1.625,1.625,10), #z step might be 5 because less z planes
+        "sink_resolution"   : (25,25,25),
+        "orientation": (-3, 2, 1), #inverts old z (dorsal -> ventral) and flips x and z
+        "processes" : None,
+        "verbose" : True,             
+        };    
   
   res.resample(ws.filename('autofluorescence'), sink=ws.filename('resampled', postfix='autofluorescence'), **resample_parameter_auto)
   
@@ -178,12 +178,12 @@ if __name__ == "__main__":
   cell_detection_parameter['illumination_correction'] = None;
   cell_detection_parameter['background_correction'] = {"shape": (15,15), "form": "Disk"};
   cell_detection_parameter['intensity_detection']['measure'] = ['source'];
-  cell_detection_parameter['shape_detection']['threshold'] = 150;
+  cell_detection_parameter['shape_detection']['threshold'] = 250;
   # cell_detection_parameter["maxima_detection"]["threshold"] = 20
   cell_detection_parameter['maxima_detection']['save'] = False #DO NOT SAVE MAXIMA WTF
   
   # io.delete_file(ws.filename('cells', postfix='maxima'))
-  cell_detection_parameter['background_correction']['save'] = ws.filename("cells", postfix="background")
+  # cell_detection_parameter['background_correction']['save'] = ws.filename("cells", postfix="background")
   
   processing_parameter = cells.default_cell_detection_processing_parameter.copy();
   processing_parameter.update(
@@ -196,7 +196,7 @@ if __name__ == "__main__":
       verbose = True
       )
   
-  cells.detect_cells(ws.source('raw'), ws.filename('cells', postfix='raw_bk5_shp150'),
+  cells.detect_cells(ws.source('raw'), ws.filename('cells', postfix='whole_brain_raw_bk15_shp250'),
                      cell_detection_parameter=cell_detection_parameter, 
                      processing_parameter=processing_parameter)
   
@@ -230,7 +230,7 @@ if __name__ == "__main__":
       'size'   : (20,None)
       }
   
-  cells.filter_cells(source = ws.filename('cells', postfix='raw_bk5_shp150'), 
+  cells.filter_cells(source = ws.filename('cells', postfix='raw_bk15_shp250'), 
                      sink = ws.filename('cells', postfix='filtered'), 
                      thresholds=thresholds);
   
