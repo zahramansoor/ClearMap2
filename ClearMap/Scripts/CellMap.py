@@ -44,10 +44,11 @@ if __name__ == "__main__":
   
   from ClearMap.Environment import *  #analysis:ignore
   
+  
   #directories and files
   directory = "/home/kepecs/Documents/2P_imaging/AA6-AK1a"    
     
-  expression_raw      = 'AA6-AK1a_640/AA6-AK1a_640-stitched_T001_Z<Z,I>_C01.tif'            
+  expression_raw      = 'cells_test/AA6-AK1a_640-stitched_T001_Z<Z,I>_C01.tif'            
   expression_auto     = 'AA6-AK1a_561/original/AA6-AK1a_561-stitched_T001_Z<Z,I>_C01.tif'
     
   ws = wsp.Workspace('CellMap', directory=directory);
@@ -92,9 +93,9 @@ if __name__ == "__main__":
   #%% Resample 
              
   resample_parameter = {
-        "source_resolution" : (1.625,1.625,10), #z step might be 5 because less z planes
+        "source_resolution" : (4.065,10), #z step might be 5 because less z planes
         "sink_resolution"   : (25,25,25),
-        "orientation": (-3, 2, 1), #inverts old z (dorsal -> ventral) and flips x and z
+        "orientation": (-3, -2, 1), #inverts old z (dorsal -> ventral) and flips x and z
         "processes" : None,
         "verbose" : True,             
         };
@@ -109,7 +110,7 @@ if __name__ == "__main__":
   resample_parameter_auto = {
         "source_resolution" : (1.625,1.625,10), #z step might be 5 because less z planes
         "sink_resolution"   : (25,25,25),
-        "orientation": (-3, 2, 1), #inverts old z (dorsal -> ventral) and flips x and z
+        "orientation": (-3, -2, 1), #inverts old z (dorsal -> ventral) and flips x and z
         "processes" : None,
         "verbose" : True,             
         };    
@@ -173,32 +174,47 @@ if __name__ == "__main__":
   ###############################################################################
   
   #%% Cell detection:
+  from itertools import product
+  #parameter sweep
+  bkshp = [(10,10),(15,15),(17,17)]
+  shpthres = [200,250,300,400]
   
-  cell_detection_parameter = cells.default_cell_detection_parameter.copy();
-  cell_detection_parameter['illumination_correction'] = None;
-  cell_detection_parameter['background_correction'] = {"shape": (15,15), "form": "Disk"};
-  cell_detection_parameter['intensity_detection']['measure'] = ['source'];
-  cell_detection_parameter['shape_detection']['threshold'] = 250;
-  # cell_detection_parameter["maxima_detection"]["threshold"] = 20
-  cell_detection_parameter['maxima_detection']['save'] = False #DO NOT SAVE MAXIMA WTF
+  # calculate number of iterations
+  tick = 0
+  for b, s in product(bkshp, shpthres):
+     tick +=1
+  sys.stdout.write("\n\nNumber of iterations is {}:".format(tick))
   
-  # io.delete_file(ws.filename('cells', postfix='maxima'))
-  # cell_detection_parameter['background_correction']['save'] = ws.filename("cells", postfix="background")
-  
-  processing_parameter = cells.default_cell_detection_processing_parameter.copy();
-  processing_parameter.update(
-      processes = 1, # 'serial', #multiple processes don't work on kepecs desktop bc of memory
-      size_max = 10, #100, #35,
-      size_min = 5,# 30, #30,
-      optimization = False,
-      optimization_fix = None,
-      overlap  = 3, #32, #10,
-      verbose = True
-      )
-  
-  cells.detect_cells(ws.source('raw'), ws.filename('cells', postfix='whole_brain_raw_bk15_shp250'),
-                     cell_detection_parameter=cell_detection_parameter, 
-                     processing_parameter=processing_parameter)
+  for i in range(tick):
+      bkshp_, shpthres_ = [xx for xx in product(bkshp, shpthres)][i] #parse out combinations
+      print("\n")
+      print("   iteration: {0}\n   background corr: {1}\n   shape detection: {2}".format(i,bkshp_, shpthres_))
+      print("\n")
+      cell_detection_parameter = cells.default_cell_detection_parameter.copy();
+      cell_detection_parameter['illumination_correction'] = None;
+      cell_detection_parameter['background_correction'] = {"shape": bkshp_, "form": "Disk"};
+      cell_detection_parameter['intensity_detection']['measure'] = ['source'];
+      cell_detection_parameter['shape_detection']['threshold'] = shpthres_;
+      # cell_detection_parameter["maxima_detection"]["threshold"] = 20
+      cell_detection_parameter['maxima_detection']['save'] = False #DO NOT SAVE MAXIMA WTF
+      
+      # io.delete_file(ws.filename('cells', postfix='maxima'))
+      # cell_detection_parameter['background_correction']['save'] = ws.filename("cells", postfix="background")
+      
+      processing_parameter = cells.default_cell_detection_processing_parameter.copy();
+      processing_parameter.update(
+          processes = 1, # 'serial', #multiple processes don't work on kepecs desktop bc of memory
+          size_max = 10, #100, #35,
+          size_min = 5,# 30, #30,
+          optimization = False,
+          optimization_fix = None,
+          overlap  = 3, #32, #10,
+          verbose = True
+          )
+      
+      cells.detect_cells(ws.source('raw'), ws.filename('cells', postfix='sweep_raw_bk{0}_shp{1}'.format(bkshp[0], shpthres)),
+                         cell_detection_parameter=cell_detection_parameter, 
+                         processing_parameter=processing_parameter)
   
   #%% visualization
   
@@ -227,11 +243,11 @@ if __name__ == "__main__":
   
   thresholds = {
       'source' : None,
-      'size'   : (20,None)
+      'size'   : (20,1000)
       }
   
-  cells.filter_cells(source = ws.filename('cells', postfix='raw_bk15_shp250'), 
-                     sink = ws.filename('cells', postfix='filtered'), 
+  cells.filter_cells(source = ws.filename('cells', postfix='whole_brain_raw_bk15_shp250'), 
+                     sink = ws.filename('cells', postfix='whole_brain_filtered_bk15_shp250_size20-1000'), 
                      thresholds=thresholds);
   
   
