@@ -46,12 +46,16 @@ if __name__ == "__main__":
   
   
   #directories and files
-  directory = "/home/kepecs/Documents/2P_imaging/AA6-AK1a"    
+  directory = "/mnt/uncertainty/AA6-AK1a"    
     
-  expression_raw      = 'cells_test/AA6-AK1a_640-stitched_T001_Z<Z,I>_C01.tif'            
-  expression_auto     = 'AA6-AK1a_561/original/AA6-AK1a_561-stitched_T001_Z<Z,I>_C01.tif'
+  expression_raw      = "AA6-AK1a_640/AA6-AK1a_640-stitched_T001_Z<Z,I>_C01.tif"                        
+  expression_auto     = "AA6-AK1a_488/AA6-AK1a_488-stitched_T001_Z<Z,I>_C01.tif"
+  # directory = "/home/kepecs/Documents/2P_imaging/AA6-AK1a"    
     
-  ws = wsp.Workspace('CellMap', directory=directory);
+  # expression_raw      = "cells_test/AA6-AK1a_640-stitched_T001_Z<Z,I>_C01.tif"            
+  # expression_auto     = "561_cells_test/AA6-AK3b_561-stitched_T001_Z<Z,I>_C01.tif"            
+  
+  ws = wsp.Workspace("CellMap", directory=directory);
   ws.update(raw=expression_raw, autofluorescence=expression_auto)
   ws.debug = False
     
@@ -93,14 +97,15 @@ if __name__ == "__main__":
   #%% Resample 
              
   resample_parameter = {
-        "source_resolution" : (4.065,10), #z step might be 5 because less z planes
+        "source_resolution" : (1.26, 1.26, 5.94), #z step might be 5 because less z planes
         "sink_resolution"   : (25,25,25),
         "orientation": (-3, -2, 1), #inverts old z (dorsal -> ventral) and flips x and z
         "processes" : None,
         "verbose" : True,             
         };
-    
-  res.resample(ws.source('raw'), sink=ws.filename('resampled'), **resample_parameter)
+  #mod because of server priviledge issues
+  sink = "/home/kepecs/Documents/AA6-AK1a_resampled.tif"   
+  res.resample(ws.source('raw'), sink=sink, **resample_parameter) #sink=ws.filename('resampled')
 
   #%%
   p3d.plot(ws.filename('resampled'))
@@ -176,8 +181,8 @@ if __name__ == "__main__":
   #%% Cell detection:
   from itertools import product
   #parameter sweep
-  bkshp = [(10,10),(15,15),(17,17)]
-  shpthres = [200,250,300,400]
+  bkshp = [(3,3)]
+  shpthres = [1900,2100,2300,2600]
   
   # calculate number of iterations
   tick = 0
@@ -188,18 +193,19 @@ if __name__ == "__main__":
   for i in range(tick):
       bkshp_, shpthres_ = [xx for xx in product(bkshp, shpthres)][i] #parse out combinations
       print("\n")
-      print("   iteration: {0}\n   background corr: {1}\n   shape detection: {2}".format(i,bkshp_, shpthres_))
+      print("   iteration: {0}\n   background corr: {1}\n   shape detection: {2}".format(i,bkshp_[0], shpthres_))
       print("\n")
       cell_detection_parameter = cells.default_cell_detection_parameter.copy();
-      cell_detection_parameter['illumination_correction'] = None;
-      cell_detection_parameter['background_correction'] = {"shape": bkshp_, "form": "Disk"};
-      cell_detection_parameter['intensity_detection']['measure'] = ['source'];
-      cell_detection_parameter['shape_detection']['threshold'] = shpthres_;
-      # cell_detection_parameter["maxima_detection"]["threshold"] = 20
-      cell_detection_parameter['maxima_detection']['save'] = False #DO NOT SAVE MAXIMA WTF
-      
-      # io.delete_file(ws.filename('cells', postfix='maxima'))
-      # cell_detection_parameter['background_correction']['save'] = ws.filename("cells", postfix="background")
+      cell_detection_parameter["illumination_correction"] = None;
+      cell_detection_parameter["background_correction"] = None;#{"shape": bkshp_, "form": "Disk"};
+      cell_detection_parameter["intensity_detection"]["measure"] = ["source"];
+      cell_detection_parameter["shape_detection"]["threshold"] = shpthres_;
+      cell_detection_parameter["maxima_detection"]["shape"] = 10
+      # cell_detection_parameter["maxima_detection"]["save"] = False #DO NOT SAVE MAXIMA WTF
+      cell_detection_parameter["maxima_detection"]["save"] = ws.filename("cells", 
+                                    postfix="maxima_561_sweep_raw_bk{0}_shp{1}".format(bkshp_[0], shpthres_))
+      # cell_detection_parameter['background_correction']['save'] = ws.filename("cells", 
+      #                               postfix="background_561_sweep_raw_shp{0}".format(shpthres_))
       
       processing_parameter = cells.default_cell_detection_processing_parameter.copy();
       processing_parameter.update(
@@ -212,7 +218,7 @@ if __name__ == "__main__":
           verbose = True
           )
       
-      cells.detect_cells(ws.source('raw'), ws.filename('cells', postfix='sweep_raw_bk{0}_shp{1}'.format(bkshp[0], shpthres)),
+      cells.detect_cells(ws.source("raw"), ws.filename("cells", postfix="561_sweep_raw_bk{0}_shp{1}".format(bkshp_[0], shpthres_)),
                          cell_detection_parameter=cell_detection_parameter, 
                          processing_parameter=processing_parameter)
   
@@ -242,13 +248,17 @@ if __name__ == "__main__":
   #%% Filter cells
   
   thresholds = {
-      'source' : None,
-      'size'   : (20,1000)
+      "source" : None,
+      "size"   : (20,None)
       }
   
-  cells.filter_cells(source = ws.filename('cells', postfix='whole_brain_raw_bk15_shp250'), 
-                     sink = ws.filename('cells', postfix='whole_brain_filtered_bk15_shp250_size20-1000'), 
-                     thresholds=thresholds);
+  #parameter sweep
+  for i in range(tick):
+      print(i)
+      bkshp_, shpthres_ = [xx for xx in product(bkshp, shpthres)][i] #parse out combinations     
+      cells.filter_cells(source = ws.filename("cells", postfix="561_sweep_raw_bk{0}_shp{1}".format(bkshp_[0], shpthres_)), 
+                         sink = ws.filename("cells", postfix="561_sweep_raw_bk{0}_shp{1}_filtered_size20".format(bkshp_[0], shpthres_)), 
+                         thresholds=thresholds);
   
   
   #%% Visualize
