@@ -31,7 +31,7 @@ __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 #ClearMap path
-import sys
+import sys, tifffile as tif
 sys.path.append('/home/kepecs/python/ClearMap2/')
 
 if __name__ == "__main__":
@@ -48,7 +48,8 @@ if __name__ == "__main__":
   #directories and files
   directory = "/mnt/uncertainty/AA6-AK1a"    
     
-  expression_raw      = "AA6-AK1a_640/AA6-AK1a_640-stitched_T001_Z<Z,I>_C01.tif"                        
+  expression_raw      = "AA6-AK1a_561/original/AA6-AK1a_561-stitched_T001_Z<Z,I>_C01.tif"
+  # "AA6-AK1a_640/AA6-AK1a_640-stitched_T001_Z<Z,I>_C01.tif"                        
   expression_auto     = "AA6-AK1a_488/AA6-AK1a_488-stitched_T001_Z<Z,I>_C01.tif"
   # directory = "/home/kepecs/Documents/2P_imaging/AA6-AK1a"    
     
@@ -69,7 +70,7 @@ if __name__ == "__main__":
   
   #init atals and reference files
   annotation_file, reference_file, distance_file=ano.prepare_annotation_files(
-      slicing=(slice(None),slice(None),slice(0,256)), orientation=(1,2,3),
+      slicing=(slice(None),slice(None),slice(None)), orientation=(1,2,3),
       overwrite=False, verbose=True);
   
   #alignment parameter files    
@@ -104,7 +105,7 @@ if __name__ == "__main__":
         "verbose" : True,             
         };
   #mod because of server priviledge issues
-  sink = "/home/kepecs/Documents/AA6-AK1a_resampled.tif"   
+  sink = "/home/kepecs/Documents/AA6-AK1a_647_resampled.tif"   
   res.resample(ws.source('raw'), sink=sink, **resample_parameter) #sink=ws.filename('resampled')
 
   #%%
@@ -113,14 +114,15 @@ if __name__ == "__main__":
   #%% Resample autofluorescence
       
   resample_parameter_auto = {
-        "source_resolution" : (1.625,1.625,10), #z step might be 5 because less z planes
+        "source_resolution" : (1.26, 1.26, 5.94), #z step might be 5 because less z planes
         "sink_resolution"   : (25,25,25),
         "orientation": (-3, -2, 1), #inverts old z (dorsal -> ventral) and flips x and z
         "processes" : None,
         "verbose" : True,             
         };    
-  
-  res.resample(ws.filename('autofluorescence'), sink=ws.filename('resampled', postfix='autofluorescence'), **resample_parameter_auto)
+  #mod because of server priviledge issues
+  sink = "/home/kepecs/Documents/AA6-AK1a_resampled.tif" 
+  res.resample(ws.filename('autofluorescence'), sink=sink, **resample_parameter_auto) #ws.filename('resampled', postfix='autofluorescence')
   
   #p3d.plot([ws.filename('resampled'), ws.filename('resampled', postfix='autofluorescence')])
   
@@ -129,15 +131,15 @@ if __name__ == "__main__":
   # align the two channels
   align_channels_parameter = {            
       #moving and reference images
-      "moving_image" : ws.filename('resampled', postfix='autofluorescence'),
-      "fixed_image"  : ws.filename('resampled'),
+      "moving_image" : "/home/kepecs/Documents/AA6-AK1a_resampled.tif",
+      "fixed_image"  : "/home/kepecs/Documents/AA6-AK1a_647_resampled.tif",
       
       #elastix parameter files for alignment
       "affine_parameter_file"  : align_channels_affine_file,
       "bspline_parameter_file" : None,
       
       #directory of the alig'/home/nicolas.renier/Documents/ClearMap_Ressources/Par0000affine.txt',nment result
-      "result_directory" :  ws.filename('resampled_to_auto')
+      "result_directory" :  "/home/kepecs/Documents/AA6-AK1a_elastix_resampled_to_auto" 
       }; 
   
   elx.align(**align_channels_parameter);
@@ -147,14 +149,14 @@ if __name__ == "__main__":
   # align autofluorescence to reference
   align_reference_parameter = {            
       #moving and reference images
-      "moving_image" : reference_file,
-      "fixed_image"  : ws.filename('resampled', postfix='autofluorescence'),
+      "moving_image" : "/home/kepecs/python/ClearMap2/ClearMap/Resources/Atlas/ABA_25um_reference.tif", #whole brain
+      "fixed_image"  : "/home/kepecs/Documents/AA6-AK1a_resampled.tif",
       
       #elastix parameter files for alignment
-      "affine_parameter_file"  :  align_reference_affine_file,
-      "bspline_parameter_file" :  align_reference_bspline_file,
+      "affine_parameter_file"  :  "/home/kepecs/python/ClearMap2/ClearMap/Resources/Alignment/align_affine.txt", 
+      "bspline_parameter_file" :  "/home/kepecs/python/ClearMap2/ClearMap/Resources/Alignment/Order2_Par0000bspline.txt", #mods from brainpipe
       #directory of the alignment result
-      "result_directory" :  ws.filename('auto_to_reference')
+      "result_directory" :  "/home/kepecs/Documents/AA6-AK1a_elastix_auto_to_reference"
       };
   
   elx.align(**align_reference_parameter);
@@ -181,46 +183,47 @@ if __name__ == "__main__":
   #%% Cell detection:
   from itertools import product
   #parameter sweep
-  bkshp = [(3,3)]
-  shpthres = [1900,2100,2300,2600]
+  # bkshp = [(3,3)]
+  # shpthres = [1900,2100,2300,2600]
   
-  # calculate number of iterations
-  tick = 0
-  for b, s in product(bkshp, shpthres):
-     tick +=1
-  sys.stdout.write("\n\nNumber of iterations is {}:".format(tick))
+  # # calculate number of iterations
+  # tick = 0
+  # for b, s in product(bkshp, shpthres):
+  #    tick +=1
+  # sys.stdout.write("\n\nNumber of iterations is {}:".format(tick))
   
-  for i in range(tick):
-      bkshp_, shpthres_ = [xx for xx in product(bkshp, shpthres)][i] #parse out combinations
-      print("\n")
-      print("   iteration: {0}\n   background corr: {1}\n   shape detection: {2}".format(i,bkshp_[0], shpthres_))
-      print("\n")
-      cell_detection_parameter = cells.default_cell_detection_parameter.copy();
-      cell_detection_parameter["illumination_correction"] = None;
-      cell_detection_parameter["background_correction"] = None;#{"shape": bkshp_, "form": "Disk"};
-      cell_detection_parameter["intensity_detection"]["measure"] = ["source"];
-      cell_detection_parameter["shape_detection"]["threshold"] = shpthres_;
-      cell_detection_parameter["maxima_detection"]["shape"] = 10
-      # cell_detection_parameter["maxima_detection"]["save"] = False #DO NOT SAVE MAXIMA WTF
-      cell_detection_parameter["maxima_detection"]["save"] = ws.filename("cells", 
-                                    postfix="maxima_561_sweep_raw_bk{0}_shp{1}".format(bkshp_[0], shpthres_))
-      # cell_detection_parameter['background_correction']['save'] = ws.filename("cells", 
-      #                               postfix="background_561_sweep_raw_shp{0}".format(shpthres_))
-      
-      processing_parameter = cells.default_cell_detection_processing_parameter.copy();
-      processing_parameter.update(
-          processes = 1, # 'serial', #multiple processes don't work on kepecs desktop bc of memory
-          size_max = 10, #100, #35,
-          size_min = 5,# 30, #30,
-          optimization = False,
-          optimization_fix = None,
-          overlap  = 3, #32, #10,
-          verbose = True
-          )
-      
-      cells.detect_cells(ws.source("raw"), ws.filename("cells", postfix="561_sweep_raw_bk{0}_shp{1}".format(bkshp_[0], shpthres_)),
-                         cell_detection_parameter=cell_detection_parameter, 
-                         processing_parameter=processing_parameter)
+  # for i in range(tick):
+  #     bkshp_, shpthres_ = [xx for xx in product(bkshp, shpthres)][i] #parse out combinations
+  #     print("\n")
+  #     print("   iteration: {0}\n   background corr: {1}\n   shape detection: {2}".format(i,bkshp_[0], shpthres_))
+  #     print("\n")
+  cell_detection_parameter = cells.default_cell_detection_parameter.copy();
+  cell_detection_parameter["illumination_correction"] = None;
+  cell_detection_parameter["background_correction"] = None; #for 640 ch {"shape": (10,10), "form": "Disk"}; 
+  cell_detection_parameter["intensity_detection"]["measure"] = ["source"];
+  cell_detection_parameter["shape_detection"]["threshold"] = 2600 #for 640 ch 500
+  # cell_detection_parameter["maxima_detection"]["shape"] = 10
+  cell_detection_parameter["maxima_detection"]["save"] = False #DO NOT SAVE MAXIMA WTF
+  # cell_detection_parameter["maxima_detection"]["save"] = ws.filename("cells", 
+                                  # postfix="maxima_561_sweep_raw_bk{0}_shp{1}".format(bkshp_[0], shpthres_))
+    # cell_detection_parameter['background_correction']['save'] = ws.filename("cells", 
+    #                               postfix="background_561_sweep_raw_shp{0}".format(shpthres_))
+    
+  processing_parameter = cells.default_cell_detection_processing_parameter.copy();
+  processing_parameter.update(
+        processes = 1, # 'serial', #multiple processes don't work on kepecs desktop bc of memory
+        size_max = 10, #100, #35,
+        size_min = 5,# 30, #30,
+        optimization = False,
+        optimization_fix = None,
+        overlap  = 3, #32, #10,
+        verbose = True
+        )
+  #old dest = ws.filename("cells", postfix="640_raw_bk10_shp500")
+  dst = "/home/kepecs/Documents/AA6-AK1a_cells_561_raw_bkNone_shp2600.npy"    
+  cells.detect_cells(ws.source("raw"), dst,
+                       cell_detection_parameter=cell_detection_parameter, 
+                       processing_parameter=processing_parameter)
   
   #%% visualization
   
@@ -274,22 +277,26 @@ if __name__ == "__main__":
   
   #%% Cell alignment
   
-  source = ws.source('cells', postfix='filtered')
-  
+  source = io.as_source("/home/kepecs/Documents/AA6-AK1a_cells_640_raw_bk10_shp500.npy")
+  imgfl = "/mnt/uncertainty/AA6-AK1a/AA6-AK1a_561/original/"
+  imgpth = [os.path.join(imgfl, xx) for xx in os.listdir(imgfl)]
+  y,x = tif.imread(imgpth[0]).shape
+  z = len(imgpth)
+  rs = "/home/kepecs/Documents/AA6-AK1a_resampled.tif" 
   def transformation(coordinates):
     coordinates = res.resample_points(
-                    coordinates, sink=None, orientation=None, 
-                    source_shape=io.shape(ws.filename('stitched')), 
-                    sink_shape=io.shape(ws.filename('resampled')));
+                    coordinates, sink=None, orientation=(-3, -2, 1), 
+                    source_shape=(x,y,z), 
+                    sink_shape=io.shape(rs));
     
     coordinates = elx.transform_points(
                     coordinates, sink=None, 
-                    transform_directory=ws.filename('resampled_to_auto'), 
+                    transform_directory="/home/kepecs/Documents/AA6-AK1a_elastix_resampled_to_auto", 
                     binary=True, indices=False);
     
     coordinates = elx.transform_points(
                     coordinates, sink=None, 
-                    transform_directory=ws.filename('auto_to_reference'),
+                    transform_directory="/home/kepecs/Documents/AA6-AK1a_elastix_auto_to_reference",
                     binary=True, indices=False);
         
     return coordinates;
@@ -299,12 +306,12 @@ if __name__ == "__main__":
   
   coordinates_transformed = transformation(coordinates);
   
-  #%% Cell annotation
+  # Cell annotation
   
   label = ano.label_points(coordinates_transformed, key='order');
   names = ano.convert_label(label, key='order', value='name');
   
-  #%% Save results
+  # Save results
   
   coordinates_transformed.dtype=[(t,float) for t in ('xt','yt','zt')]
   label = np.array(label, dtype=[('order', int)]);
@@ -313,19 +320,17 @@ if __name__ == "__main__":
   import numpy.lib.recfunctions as rfn
   cells_data = rfn.merge_arrays([source[:], coordinates_transformed, label, names], flatten=True, usemask=False)
   
-  io.write(ws.filename('cells'), cells_data)
+  io.write("/home/kepecs/Documents/AA6-AK1a_cells.npy", cells_data)
   
-  
-  
-  #%%############################################################################
+  #############################################################################
   ### Cell csv generation for external analysis
   ###############################################################################
   
-  #%% CSV export
+  # CSV export
   
-  source = ws.source('cells');
+  source = np.load("/home/kepecs/Documents/AA6-AK1a_cells.npy")
   header = ', '.join([h[0] for h in source.dtype.names]);
-  np.savetxt(ws.filename('cells', extension='csv'), source[:], header=header, delimiter=',', fmt='%s')
+  np.savetxt("/home/kepecs/Documents/AA6-AK1a_cells.csv", source[:], header=header, delimiter=',', fmt='%s')
   
   #%% ClearMap 1.0 export
   
@@ -345,13 +350,15 @@ if __name__ == "__main__":
   ### Voxelization - cell density
   ###############################################################################
   
-  source = ws.source('cells')
+  source = np.load("/home/kepecs/Documents/AA6-AK1a_points/posttransformed_zyx_voxels.npy")
   
-  coordinates = np.array([source[n] for n in ['xt','yt','zt']]).T;
+  coordinates = np.array([[xx[2],xx[1],xx[0]] for xx in source]);#xyz
   intensities = source['source'];
   
-  #%% Unweighted 
+  # Unweighted 
   
+  #whole brain
+  annotation_file = "/home/kepecs/python/ClearMap2/ClearMap/Resources/Atlas/ABA_25um_annotation.tif"
   voxelization_parameter = dict(
         shape = io.shape(annotation_file), 
         dtype = None, 
@@ -363,7 +370,7 @@ if __name__ == "__main__":
         verbose = True
       )
   
-  vox.voxelize(coordinates, sink=ws.filename('density', postfix='counts'), **voxelization_parameter);
+  vox.voxelize(coordinates, sink="/home/kepecs/Documents/AA6-AK1a_density_counts.tif", **voxelization_parameter);
   
   
   #%% 

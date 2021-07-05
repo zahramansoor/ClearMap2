@@ -896,18 +896,19 @@ def resample_points(source, sink = None, resample_source = None, resample_sink =
   if orientation is not None:
     #permute
     per = orientation_to_permuation(orientation);
-    resampled = resampled.transpose(per);
+    #alternative transpose
+    resampled = np.array([[xx[per[0]], xx[per[1]], xx[per[2]]] for xx in resampled])
+    # resampled = resampled.transpose(per);
 
     #reverse axes
-    reslice = False;
-    slicing = [slice(None)] * len(source_shape);
+    #this doesn't work for points??????!!!!!!!!!!!!!!!!!
+    resampled_oriented = np.copy(resampled)
+    xo,yo,zo = sink_shape
+    init = (xo,yo,zo) #initilize full size dimensions
     for d,o in enumerate(orientation):
       if o < 0:
-        slicing[d] = slice(None, None, -1);
-        reslice = True;
-    if reslice:
-      resampled = resampled[slicing];
-  
+          resampled_oriented[:,d] = init[d] - resampled[:,d]
+          
   return io.write(sink, resampled);
 
 
