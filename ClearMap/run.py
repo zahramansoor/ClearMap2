@@ -31,7 +31,7 @@ __webpage__   = 'http://idisco.info'
 __download__  = 'http://www.github.com/ChristophKirst/ClearMap2'
 
 #ClearMap path
-import sys, tifffile as tif
+import sys, tifffile as tif, os
 import argparse
 sys.path.append('/home/kepecs/python/ClearMap2/')
 
@@ -46,7 +46,7 @@ def parsecmdline():
     parser.add_argument(
         "--channel1", help="Cell channel 1", type=int, default=640)
     parser.add_argument(
-        "--channel2", help="Cell channel 2", type=int, default=561)
+        "--channel2", help="Cell channel 2", type=int, default=561) #allows for cell detection on more than 1 channel per brain
     parser.add_argument(
         "--backgroundparam", help="Background subtraction parameter",
         type=tuple, default=(10,10))
@@ -65,6 +65,7 @@ def parsecmdline():
     return parser.parse_args()
 
 def fillargs(args):
+    """kepecs lab experiment specific params"""
     args.src = "/mnt/uncertainty"
     args.background640 = (10,10)
     args.cellshape640 = 500
@@ -88,7 +89,7 @@ if __name__ == "__main__":
   args = parsecmdline()
   args = fillargs(args)
   directory = os.path.join(args.src, args.brainname)
-  #identify strings
+  #identify strings to feed into regex
   str_auto = os.listdir(os.path.join(directory, "{0}_{1}".format(args.brainname, 488)))[98][:-12]
   str_ch1 = os.listdir(os.path.join(directory, "{0}_{1}".format(args.brainname, args.channel1)))[89][:-12]
   expression_ch1      = "{0}_{1}/{2}Z<Z,I>_C01.tif".format(args.brainname, args.channel1, str_ch1)
@@ -121,7 +122,7 @@ if __name__ == "__main__":
   ###############################################################################
         
   #%% Resample 
-  print(args.zstep)             
+  
   resample_parameter = {
         "source_resolution" : (1.26, 1.26, args.zstep), #z step might be 5 because less z planes
         "sink_resolution"   : (25,25,25),
@@ -131,10 +132,10 @@ if __name__ == "__main__":
         };
   #mod because of server priviledge issues
   sink_ch1 = os.path.join(args.dst, args.brainname+"_{}_resampled.tif".format(args.channel1))   
-  res.resample(ws.source("ch1"), sink=sink_ch1, **resample_parameter) 
-  if args.channel2:
-      sink_ch2 = os.path.join(args.dst, args.brainname+"_{}_resampled.tif".format(args.channel1))   
-      res.resample(ws.source("ch2"), sink=sink_ch2, **resample_parameter) 
+  # res.resample(ws.source("ch1"), sink=sink_ch1, **resample_parameter) 
+  if isinstance(args.channel2,int):
+      sink_ch2 = os.path.join(args.dst, args.brainname+"_{}_resampled.tif".format(args.channel2))   
+      # res.resample(ws.source("ch2"), sink=sink_ch2, **resample_parameter) 
 
   #%% Resample autofluorescence
       
@@ -147,61 +148,60 @@ if __name__ == "__main__":
         };    
   #mod because of server priviledge issues
   sink_auto = os.path.join(args.dst, args.brainname+"_auto_resampled.tif")   
-  res.resample(ws.filename("autofluorescence"), sink=sink_auto, **resample_parameter_auto) 
-  ws.update(resampled = sink_auto, resampled_to_auto_ch1 = sink_ch1)
-  if args.channel2:
-      ws.update(resampled_to_auto_ch2 = sink_ch2)
+  # res.resample(ws.filename("autofluorescence"), sink=sink_auto, **resample_parameter_auto) 
+  # ws.update(resampled = sink_auto, resampled_to_auto_ch1 = sink_ch1)
+  # if isinstance(args.channel2,int):
+      # ws.update(resampled_to_auto_ch2 = sink_ch2)
   #%% Aignment - resampled to autofluorescence
   
   # align the two channels
-  align_channels_parameter = {            
-      #moving and reference images
-      "moving_image" : ws.filename("resampled"),
-      "fixed_image"  : ws.filename("resampled_to_auto_ch1"),
+  # align_channels_parameter = {            
+  #     #moving and reference images
+  #     "moving_image" : sink_auto,
+  #     "fixed_image"  : sink_ch1,
       
-      #elastix parameter files for alignment
-      "affine_parameter_file"  : align_channels_affine_file,
-      "bspline_parameter_file" : None,
+  #     #elastix parameter files for alignment
+  #     "affine_parameter_file"  : align_channels_affine_file,
+  #     "bspline_parameter_file" : None,
       
-      #directory of the alig'/home/nicolas.renier/Documents/ClearMap_Ressources/Par0000affine.txt',nment result
-      "result_directory" :  os.path.join(args.dst, args.brainname+"_elastix_resampled_to_auto_ch1" )
-      }; 
+  #     "result_directory" :  os.path.join(args.dst, args.brainname+"_elastix_resampled_to_auto_ch1" )
+  #     }; 
   
-  elx.align(**align_channels_parameter);
-  if args.channel2:
+  # elx.align(**align_channels_parameter);
+  
+  if isinstance(args.channel2,int):
       # align the two channels
       align_channels_parameter = {            
           #moving and reference images
-          "moving_image" : ws.filename("resampled"),
-          "fixed_image"  : ws.filename("resampled_to_auto_ch2"),
+          "moving_image" : sink_auto,
+          "fixed_image"  : sink_ch2,
           
           #elastix parameter files for alignment
           "affine_parameter_file"  : align_channels_affine_file,
           "bspline_parameter_file" : None,
           
-          #directory of the alig'/home/nicolas.renier/Documents/ClearMap_Ressources/Par0000affine.txt',nment result
           "result_directory" :  os.path.join(args.dst, args.brainname+"_elastix_resampled_to_auto_ch2" )
           }; 
       
-      elx.align(**align_channels_parameter);
+      # elx.align(**align_channels_parameter);
   
   
   #%% Alignment - autoflourescence to reference
   
   # align autofluorescence to reference
-  align_reference_parameter = {            
-      #moving and reference images
-      "moving_image" : "/home/kepecs/python/ClearMap2/ClearMap/Resources/Atlas/ABA_25um_reference.tif", #whole brain
-      "fixed_image"  : ws.filename("resampled"),
+  # align_reference_parameter = {            
+  #     #moving and reference images
+  #     "moving_image" : "/home/kepecs/python/ClearMap2/ClearMap/Resources/Atlas/ABA_25um_reference.tif", #whole brain
+  #     "fixed_image"  : sink_auto,
       
-      #elastix parameter files for alignment
-      "affine_parameter_file"  :  align_reference_affine_file, 
-      "bspline_parameter_file" :  align_reference_bspline_file, #mods from brainpipe
-      #directory of the alignment result
-      "result_directory" :  os.path.join(args.dst, args.brainname+"_elastix_auto_to_reference")
-      };
+  #     #elastix parameter files for alignment
+  #     "affine_parameter_file"  :  align_reference_affine_file, 
+  #     "bspline_parameter_file" :  align_reference_bspline_file, #mods from brainpipe
+  #     #directory of the alignment result
+  #     "result_directory" :  os.path.join(args.dst, args.brainname+"_elastix_auto_to_reference")
+  #     };
   
-  elx.align(**align_reference_parameter);
+  # elx.align(**align_reference_parameter);
   
 
   #%%############################################################################
@@ -238,8 +238,9 @@ if __name__ == "__main__":
         overlap  = 3, #32, #10,
         verbose = True
         )
-  dstch1 = os.path.join(args.dst, "{0}_cells_{1}_raw.npy".format(args.brainname, args.channel1))    
-  cells.detect_cells(ws.source("ch1"), dst,
+  dstch1 = os.path.join(args.dst, "{0}_cells_{1}_raw.npy".format(args.brainname, args.channel1)) 
+  print("\n\n STARTING CELL DETECTION FOR CHANNEL: {0}".format(args.channel1))   
+  cells.detect_cells(ws.source("ch1"), dstch1,
                        cell_detection_parameter=cell_detection_parameter, 
                        processing_parameter=processing_parameter)
   
@@ -255,7 +256,9 @@ if __name__ == "__main__":
       
   cell_detection_parameter = cells.default_cell_detection_parameter.copy();
   cell_detection_parameter["illumination_correction"] = None;
-  cell_detection_parameter["background_correction"] = background; #for 640 ch {"shape": (10,10), "form": "Disk"}; 
+  if background is not None: 
+      cell_detection_parameter["background_correction"] = {"shape": background, "form": "Disk"}; 
+  else: cell_detection_parameter["background_correction"] = background
   cell_detection_parameter["intensity_detection"]["measure"] = ["source"];
   cell_detection_parameter["shape_detection"]["threshold"] = cellshape #for 640 ch 500
   cell_detection_parameter["maxima_detection"]["shape"] = maximashape
@@ -271,13 +274,14 @@ if __name__ == "__main__":
         overlap  = 3, #32, #10,
         verbose = True
         )
-  dstch2 = os.path.join(args.dst, "{0}_cells_{1}_raw.npy".format(args.brainname, args.channel2))    
-  cells.detect_cells(ws.source("ch2"), dst,
+  dstch2 = os.path.join(args.dst, "{0}_cells_{1}_raw.npy".format(args.brainname, args.channel2))
+  print("\n\n STARTING CELL DETECTION FOR CHANNEL: {0}".format(args.channel2))       
+  cells.detect_cells(ws.source("ch2"), dstch2,
                        cell_detection_parameter=cell_detection_parameter, 
                        processing_parameter=processing_parameter)
   
   #update
-  ws.update(cells_ch1 = dstch1, cells_ch2 = dstch2)
+  # ws.update(cells_ch1 = dstch1, cells_ch2 = dstch2)
   #%% Filter cells
   
   thresholds = {
@@ -285,8 +289,12 @@ if __name__ == "__main__":
       "size"   : (20,None)
       }
   
+  #channel 1
   cells.filter_cells(source = ws.filename("cells_ch1"), 
                          sink = ws.filename("cells_ch1", postfix="filtered_size20"), 
                          thresholds=thresholds);
-  
+  #channel 2
+  cells.filter_cells(source = ws.filename("cells_ch2"), 
+                         sink = ws.filename("cells_ch2", postfix="filtered_size20"), 
+                         thresholds=thresholds);
   
