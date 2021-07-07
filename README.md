@@ -77,6 +77,9 @@ Please refer to our [documentation](https://christophkirst.github.io/ClearMap2Do
 on how to [install](https://christophkirst.github.io/ClearMap2Documentation/html/installation.html) ClearMap.
 
 ## NOTE: for Linux users, C++ compilation requires gcc & g++ version < 9 (7 works)
+## NOTE: for zahra's edits, you need to install elastix on Linux:
+```$ sudo apt-get install elastix 
+```
 
 [Tutorials](https://christophkirst.github.io/ClearMap2Documentation/html/usage.html)
 ====================================================================================
