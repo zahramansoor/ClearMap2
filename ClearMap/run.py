@@ -72,7 +72,7 @@ def fillargs(args):
     args.maximashape640 = 5
     args.background561 = None
     args.cellshape561 = 2600
-    args.maximashape640 = 10
+    args.maximashape561 = 10
     
     return args
 
@@ -154,18 +154,18 @@ if __name__ == "__main__":
       # ws.update(resampled_to_auto_ch2 = sink_ch2)
   #%% Aignment - resampled to autofluorescence
   
-  # align the two channels
-  # align_channels_parameter = {            
-  #     #moving and reference images
-  #     "moving_image" : sink_auto,
-  #     "fixed_image"  : sink_ch1,
+  #align the two channels
+  align_channels_parameter = {            
+       #moving and reference images
+       "moving_image" : sink_auto,
+       "fixed_image"  : sink_ch1,
       
-  #     #elastix parameter files for alignment
-  #     "affine_parameter_file"  : align_channels_affine_file,
-  #     "bspline_parameter_file" : None,
+       #elastix parameter files for alignment
+       "affine_parameter_file"  : align_channels_affine_file,
+       "bspline_parameter_file" : None,
       
-  #     "result_directory" :  os.path.join(args.dst, args.brainname+"_elastix_resampled_to_auto_ch1" )
-  #     }; 
+       "result_directory" :  os.path.join(args.dst, args.brainname+"_elastix_resampled_to_auto_ch1" )
+       }; 
   
   # elx.align(**align_channels_parameter);
   
@@ -188,18 +188,18 @@ if __name__ == "__main__":
   
   #%% Alignment - autoflourescence to reference
   
-  # align autofluorescence to reference
-  # align_reference_parameter = {            
-  #     #moving and reference images
-  #     "moving_image" : "/home/kepecs/python/ClearMap2/ClearMap/Resources/Atlas/ABA_25um_reference.tif", #whole brain
-  #     "fixed_image"  : sink_auto,
+  #align autofluorescence to reference
+  align_reference_parameter = {            
+       #moving and reference images
+       "moving_image" : "/home/kepecs/python/ClearMap2/ClearMap/Resources/Atlas/ABA_25um_reference.tif", #whole brain
+       "fixed_image"  : sink_auto,
       
-  #     #elastix parameter files for alignment
-  #     "affine_parameter_file"  :  align_reference_affine_file, 
-  #     "bspline_parameter_file" :  align_reference_bspline_file, #mods from brainpipe
-  #     #directory of the alignment result
-  #     "result_directory" :  os.path.join(args.dst, args.brainname+"_elastix_auto_to_reference")
-  #     };
+       #elastix parameter files for alignment
+       "affine_parameter_file"  :  align_reference_affine_file, 
+       "bspline_parameter_file" :  align_reference_bspline_file, #mods from brainpipe
+       #directory of the alignment result
+       "result_directory" :  os.path.join(args.dst, args.brainname+"_elastix_auto_to_reference")
+       };
   
   # elx.align(**align_reference_parameter);
   
@@ -222,7 +222,9 @@ if __name__ == "__main__":
       
   cell_detection_parameter = cells.default_cell_detection_parameter.copy();
   cell_detection_parameter["illumination_correction"] = None;
-  cell_detection_parameter["background_correction"] = background; #for 640 ch {"shape": (10,10), "form": "Disk"}; 
+  if background is not None: 
+      cell_detection_parameter["background_correction"] = {"shape": background, "form": "Disk"}; 
+  else: cell_detection_parameter["background_correction"] = background
   cell_detection_parameter["intensity_detection"]["measure"] = ["source"];
   cell_detection_parameter["shape_detection"]["threshold"] = cellshape #for 640 ch 500
   cell_detection_parameter["maxima_detection"]["shape"] = maximashape
@@ -290,11 +292,11 @@ if __name__ == "__main__":
       }
   
   #channel 1
-  cells.filter_cells(source = ws.filename("cells_ch1"), 
-                         sink = ws.filename("cells_ch1", postfix="filtered_size20"), 
+  cells.filter_cells(source = dstch1, 
+                         sink = os.path.join(args.dst, "{0}_cells_{1}_filtered20.npy".format(args.brainname, args.channel1)), 
                          thresholds=thresholds);
   #channel 2
-  cells.filter_cells(source = ws.filename("cells_ch2"), 
-                         sink = ws.filename("cells_ch2", postfix="filtered_size20"), 
+  cells.filter_cells(source = dstch2, 
+                         sink = os.path.join(args.dst, "{0}_cells_{1}_filtered20.npy".format(args.brainname, args.channel2)), 
                          thresholds=thresholds);
   
