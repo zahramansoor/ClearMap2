@@ -195,6 +195,8 @@ def parsecmdline():
         "zstep", help="Z step size (in um)",
         type=float)
     parser.add_argument(
+        "--autochannel", help="Autofluorescence channel", type=int, default=488)
+    parser.add_argument(
         "--channel1", help="Cell channel 1", type=int, default=640)
     parser.add_argument(
         "--channel2", help="Cell channel 2", type=int, default=561) #allows for cell detection on more than 1 channel per brain
@@ -209,14 +211,15 @@ def parsecmdline():
         type=int, default=5)
     parser.add_argument(
         "--orientation", help="Reorientation paramters in xyz, e.g. (-3,-2,1) flips z and y",
-        type=tuple, default=(-3, -2, 1))
+        type=tuple, default=(3, -2, 1))
     parser.add_argument(
         "--dst", help="Save destination",
         type=str, default="/home/kepecs/Documents/")
     return parser.parse_args()
 
 def fillargs(args):
-    """kepecs lab experiment specific params"""
+    """kepecs lab experiment specific params
+    for Shujing's cfos dataset, July 2021"""
     args.src = "/mnt/uncertainty"
     args.background640 = (10,10)
     args.cellshape640 = 500
@@ -224,6 +227,7 @@ def fillargs(args):
     args.background561 = None
     args.cellshape561 = 2600
     args.maximashape561 = 10
+    if not os.path.exists(args.dst): os.mkdir(args.dst)
     
     return args
 
@@ -241,10 +245,10 @@ if __name__ == "__main__":
   args = fillargs(args)
   directory = os.path.join(args.src, args.brainname)
   #identify strings to feed into regex
-  str_auto = os.listdir(os.path.join(directory, "{0}_{1}".format(args.brainname, 488)))[98][:-12]
+  str_auto = os.listdir(os.path.join(directory, "{0}_{1}".format(args.brainname, args.autochannel)))[98][:-12]
   str_ch1 = os.listdir(os.path.join(directory, "{0}_{1}".format(args.brainname, args.channel1)))[89][:-12]
   expression_ch1      = "{0}_{1}/{2}Z<Z,I>_C01.tif".format(args.brainname, args.channel1, str_ch1)
-  expression_auto     = "{0}_{1}/{2}Z<Z,I>_C01.tif".format(args.brainname, 488, str_auto)
+  expression_auto     = "{0}_{1}/{2}Z<Z,I>_C01.tif".format(args.brainname, args.autochannel, str_auto)
 
   ws = wsp.Workspace("CellMap", directory=directory);
   if isinstance(args.channel2,int):
@@ -283,7 +287,7 @@ if __name__ == "__main__":
         };
   #mod because of server priviledge issues
   sink_ch1 = os.path.join(args.dst, args.brainname+"_{}_resampled.tif".format(args.channel1))   
-  # res.resample(ws.source("ch1"), sink=sink_ch1, **resample_parameter) 
+  res.resample(ws.source("ch1"), sink=sink_ch1, **resample_parameter) 
   if isinstance(args.channel2,int):
       sink_ch2 = os.path.join(args.dst, args.brainname+"_{}_resampled.tif".format(args.channel2))   
       res.resample(ws.source("ch2"), sink=sink_ch2, **resample_parameter) 
@@ -299,7 +303,7 @@ if __name__ == "__main__":
         };    
   #mod because of server priviledge issues
   sink_auto = os.path.join(args.dst, args.brainname+"_auto_resampled.tif")   
-  # res.resample(ws.filename("autofluorescence"), sink=sink_auto, **resample_parameter_auto) 
+  res.resample(ws.filename("autofluorescence"), sink=sink_auto, **resample_parameter_auto) 
   # ws.update(resampled = sink_auto, resampled_to_auto_ch1 = sink_ch1)
   # if isinstance(args.channel2,int):
       # ws.update(resampled_to_auto_ch2 = sink_ch2)
@@ -352,7 +356,7 @@ if __name__ == "__main__":
        "result_directory" :  os.path.join(args.dst, args.brainname+"_elastix_auto_to_reference")
        };
   
-  # elx.align(**align_reference_parameter);
+  elx.align(**align_reference_parameter);
   
 
   #%%############################################################################
@@ -361,7 +365,7 @@ if __name__ == "__main__":
   
   #%% Cell detection:
   
-  #channel 1
+   #channel 1
   if args.channel1 == 640:
       background = args.background640
       cellshape = args.cellshape640
@@ -379,23 +383,22 @@ if __name__ == "__main__":
   cell_detection_parameter["intensity_detection"]["measure"] = ["source"];
   cell_detection_parameter["shape_detection"]["threshold"] = cellshape #for 640 ch 500
   cell_detection_parameter["maxima_detection"]["shape"] = maximashape
-  cell_detection_parameter["maxima_detection"]["save"] = False #DO NOT SAVE MAXIMA WTF
 
   processing_parameter = cells.default_cell_detection_processing_parameter.copy();
   processing_parameter.update(
-        processes = 1, # 'serial', #multiple processes don't work on kepecs desktop bc of memory
-        size_max = 10, #100, #35,
-        size_min = 5,# 30, #30,
-        optimization = False,
-        optimization_fix = None,
-        overlap  = 3, #32, #10,
-        verbose = True
-        )
+         processes = 1, # 'serial', #multiple processes don't work on kepecs desktop bc of memory
+         size_max = 10, #100, #35,
+         size_min = 5,# 30, #30,
+         optimization = False,
+         optimization_fix = None,
+         overlap  = 3, #32, #10,
+         verbose = True
+         )
   dstch1 = os.path.join(args.dst, "{0}_cells_{1}_raw.npy".format(args.brainname, args.channel1)) 
   print("\n\n STARTING CELL DETECTION FOR CHANNEL: {0}".format(args.channel1))   
-  # cells.detect_cells(ws.source("ch1"), dstch1,
-  #                      cell_detection_parameter=cell_detection_parameter, 
-  #                      processing_parameter=processing_parameter)
+  cells.detect_cells(ws.source("ch1"), dstch1,
+                       cell_detection_parameter=cell_detection_parameter, 
+                       processing_parameter=processing_parameter)
   
   #channel 2
   if args.channel2 == 640:
@@ -415,93 +418,91 @@ if __name__ == "__main__":
   cell_detection_parameter["intensity_detection"]["measure"] = ["source"];
   cell_detection_parameter["shape_detection"]["threshold"] = cellshape #for 640 ch 500
   cell_detection_parameter["maxima_detection"]["shape"] = maximashape
-  cell_detection_parameter["maxima_detection"]["save"] = False #DO NOT SAVE MAXIMA WTF
 
   processing_parameter = cells.default_cell_detection_processing_parameter.copy();
   processing_parameter.update(
-        processes = 1, # 'serial', #multiple processes don't work on kepecs desktop bc of memory
-        size_max = 10, #100, #35,
-        size_min = 5,# 30, #30,
-        optimization = False,
-        optimization_fix = None,
-        overlap  = 3, #32, #10,
-        verbose = True
-        )
+         processes = 1, # 'serial', #multiple processes don't work on kepecs desktop bc of memory
+         size_max = 10, #100, #35,
+         size_min = 5,# 30, #30,
+         optimization = False,
+         optimization_fix = None,
+         overlap  = 3, #32, #10,
+         verbose = True
+         )
   dstch2 = os.path.join(args.dst, "{0}_cells_{1}_raw.npy".format(args.brainname, args.channel2))
   print("\n\n STARTING CELL DETECTION FOR CHANNEL: {0}".format(args.channel2))       
-  # cells.detect_cells(ws.source("ch2"), dstch2,
-  #                      cell_detection_parameter=cell_detection_parameter, 
-  #                      processing_parameter=processing_parameter)
+  cells.detect_cells(ws.source("ch2"), dstch2,
+            cell_detection_parameter=cell_detection_parameter, 
+            processing_parameter=processing_parameter)
   
-  #update
-  # ws.update(cells_ch1 = dstch1, cells_ch2 = dstch2)
-  #%% Filter cells
+   #update
+   # ws.update(cells_ch1 = dstch1, cells_ch2 = dstch2)
+   #%% Filter cells
   
   thresholds = {
-      "source" : None,
-      "size"   : (20,None)
+       "source" : None,
+       "size"   : (20,None)
       } 
-  #channel 1 
+   #channel 1 
   cells.filter_cells(source = dstch1, 
                       sink = os.path.join(args.dst, "{0}_cells_{1}_filtered20.npy".format(args.brainname, args.channel1)), 
                       thresholds=thresholds);
-  #channel 2
+   #channel 2
   cells.filter_cells(source = dstch2, 
                         sink = os.path.join(args.dst, "{0}_cells_{1}_filtered20.npy".format(args.brainname, args.channel2)), 
                         thresholds=thresholds);
 
-  #%% Point transform - zd edits
+#%% Point transform - zd edits
   #channel 1 & 2
   if isinstance(args.channel1,int) and isinstance(args.channel2, int):
       channels = [(1,args.channel1), (2,args.channel2)]
   elif isinstance(args.channel1,int) and not isinstance(args.channel2, int):
       channels = [(1,args.channel1)]
   for chnum, channel in channels:    
-      cells = os.path.join(args.dst, "{0}_cells_{1}_filtered20.npy".format(args.brainname, channel))
-      pnts = np.load(cells)
-      pnts = np.array([pnts[c] for c in 'zyx']).T
-      #for resize dimensions
-      downsized = tif.imread(sink_ch1) #sagittal
-      zd,yd,xd = downsized.shape #sagittal
-      #reorient pnts
-      pnts_sag = np.array([[xx[2],xx[1],xx[0]] for xx in pnts]) #from xyz
-      #get full size dims
-      stitched = os.path.join(directory, "{0}_{1}".format(args.brainname, channel))
-      y,z = tif.imread(os.path.join(stitched, os.listdir(stitched)[56])).shape #sagittal
-      x = len([xx for xx in os.listdir(stitched) if ".tif" in xx]) #sagittal
-      f = ((zd/z),(yd/y),(xd/x))
-      downsized_pnts_sag = np.array([[xx[0]*f[0],xx[1]*f[1],xx[2]*f[2]] for xx in pnts_sag]).astype(int)
-      #flip z and y
-      #map cells first
-      cell=np.zeros((zd,yd,xd)) 
-      for pnt in downsized_pnts_sag :
-          z,y,x=pnt
-          cell[z,y,x] = 1
-      #flip x and y
-      cell_oriented = np.flip(cell, (1,2))    
-      #get coordinates again
-      downsized_pnts_sag_oriented = np.nonzero(cell_oriented)
-      downsized_pnts_sag_oriented = np.array([downsized_pnts_sag_oriented[0],downsized_pnts_sag_oriented[1],downsized_pnts_sag_oriented[2]]).T
-      #transform
-      #make into transformix-friendly text file
-      transformed_dst = os.path.join(args.dst, "{0}_{1}_points".format(args.brainname, channel))
-      if not os.path.exists(transformed_dst): os.mkdir(transformed_dst)
-      pretransform_text_file = create_text_file_for_elastix(downsized_pnts_sag_oriented, transformed_dst)
-      #get transform files
-      transformfiles = []
-      lstch1 = [os.path.join(os.path.join(args.dst, args.brainname+"_elastix_resampled_to_auto_ch{0}".format(chnum)), xx)
-                for xx in os.listdir(os.path.join(args.dst, args.brainname+"_elastix_resampled_to_auto_ch{0}".format(chnum))) if "TransformParameters" in xx]; lstch1.sort()
-      lstauto = [os.path.join(os.path.join(args.dst, args.brainname+"_elastix_auto_to_reference" ), xx) 
-                 for xx in os.listdir(os.path.join(args.dst, args.brainname+"_elastix_auto_to_reference" )) if "TransformParameters" in xx]; lstauto.sort()
-      transformfiles.append(lstch1)
-      transformfiles.append(lstauto)
-      transformfiles = [os.path.abspath(xx) for xx in list(itertools.chain.from_iterable(transformfiles))]
+       cells = os.path.join(args.dst, "{0}_cells_{1}_filtered20.npy".format(args.brainname, channel))
+       pnts = np.load(cells)
+       pnts = np.array([pnts[c] for c in 'zyx']).T
+       #for resize dimensions
+       downsized = tif.imread(sink_ch1) #sagittal
+       zd,yd,xd = downsized.shape #sagittal
+       #reorient pnts
+       pnts_sag = np.array([[xx[2],xx[1],xx[0]] for xx in pnts]) #from xyz
+       #get full size dims
+       stitched = os.path.join(directory, "{0}_{1}".format(args.brainname, channel))
+       y,z = tif.imread(os.path.join(stitched, os.listdir(stitched)[56])).shape #sagittal
+       x = len([xx for xx in os.listdir(stitched) if ".tif" in xx]) #sagittal
+       f = ((zd/z),(yd/y),(xd/x))
+       downsized_pnts_sag = np.array([[xx[0]*f[0],xx[1]*f[1],xx[2]*f[2]] for xx in pnts_sag]).astype(int)
+       #map cells first
+       cell=np.zeros((zd,yd,xd)) 
+       for pnt in downsized_pnts_sag :
+           z,y,x=pnt
+           cell[z,y,x] = 1
+       #flip x and y
+       cell_oriented = np.flip(cell, axis=0)    
+       #get coordinates again
+       downsized_pnts_sag_oriented = np.nonzero(cell_oriented)
+       downsized_pnts_sag_oriented = np.array([downsized_pnts_sag_oriented[0],downsized_pnts_sag_oriented[1],downsized_pnts_sag_oriented[2]]).T
+       #transform
+       #make into transformix-friendly text file
+       transformed_dst = os.path.join(args.dst, "{0}_{1}_points".format(args.brainname, channel))
+       if not os.path.exists(transformed_dst): os.mkdir(transformed_dst)
+       pretransform_text_file = create_text_file_for_elastix(downsized_pnts_sag_oriented, transformed_dst)
+       #get transform files
+       transformfiles = []
+       lstch1 = [os.path.join(os.path.join(args.dst, args.brainname+"_elastix_resampled_to_auto_ch{0}".format(chnum)), xx)
+                 for xx in os.listdir(os.path.join(args.dst, args.brainname+"_elastix_resampled_to_auto_ch{0}".format(chnum))) if "TransformParameters" in xx]; lstch1.sort()
+       lstauto = [os.path.join(os.path.join(args.dst, args.brainname+"_elastix_auto_to_reference" ), xx) 
+                  for xx in os.listdir(os.path.join(args.dst, args.brainname+"_elastix_auto_to_reference" )) if "TransformParameters" in xx]; lstauto.sort()
+       transformfiles.append(lstch1)
+       transformfiles.append(lstauto)
+       transformfiles = list(itertools.chain.from_iterable(transformfiles))
       
-      #copy over elastix files
-      transformfiles = modify_transform_files(transformfiles, transformed_dst) 
-      change_transform_parameter_initial_transform(transformfiles[0], 'NoInitialTransform')
-      #run transformix on points
-      points_file = point_transformix(pretransform_text_file, transformfiles[-1], transformed_dst)
-      #convert registered points into structure counts
-      converted_points = unpack_pnts(points_file, transformed_dst)
-  
+       #copy over elastix files
+       transformfiles = modify_transform_files(transformfiles, transformed_dst) 
+       change_transform_parameter_initial_transform(transformfiles[0], 'NoInitialTransform')
+       #run transformix on points
+       points_file = point_transformix(pretransform_text_file, transformfiles[-1], transformed_dst)
+       #convert registered points into structure counts
+       converted_points = unpack_pnts(points_file, transformed_dst)
+ 
