@@ -201,17 +201,26 @@ def parsecmdline():
     parser.add_argument(
         "--channel2", help="Cell channel 2", type=int, default=561) #allows for cell detection on more than 1 channel per brain
     parser.add_argument(
-        "--backgroundparam", help="Background subtraction parameter",
-        type=tuple, default=(10,10))
+        "--backgroundparamch1", help="Background subtraction parameter",
+        default=10)
     parser.add_argument(
-        "--cellshape", help="Cell shape parameter",
+        "--cellshapech1", help="Cell shape parameter",
         type=int, default=500)
     parser.add_argument(
-        "--maximashape", help="Maxima detection shape",
+        "--maximashapech1", help="Maxima detection shape",
         type=int, default=5)
     parser.add_argument(
-        "--orientation", help="Reorientation paramters in xyz, e.g. (-3,-2,1) flips z and y",
-        type=tuple, default=(3, -2, 1))
+        "--backgroundparamch2", help="Background subtraction parameter",
+        default=None)
+    parser.add_argument(
+        "--cellshapech2", help="Cell shape parameter",
+        type=int, default=2600)
+    parser.add_argument(
+        "--maximashapech2", help="Maxima detection shape",
+        type=int, default=15)
+    parser.add_argument(
+        "--flipax", help="Specify axes to flip, e.g. z and y",
+        nargs="+", default=[3, 2])
     parser.add_argument(
         "--dst", help="Save destination",
         type=str, default="/home/kepecs/Documents/")
@@ -221,12 +230,23 @@ def fillargs(args):
     """kepecs lab experiment specific params
     for Shujing's cfos dataset, July 2021"""
     args.src = "/mnt/uncertainty"
-    args.background640 = (10,10)
-    args.cellshape640 = 500
-    args.maximashape640 = 5
-    args.background561 = None
-    args.cellshape561 = 2600
-    args.maximashape561 = 10
+    if not args.backgroundparamch1 == None:
+        args.backgroundparamch1 = int(args.backgroundparamch1)
+    if not args.backgroundparamch2 == None:
+        args.backgroundparamch2 = int(args.backgroundparamch2)
+    args.orientation = [3,2,1]
+    for axs in args.flipax: #apply flip sign to arguments
+        if axs in args.orientation:
+            ind = args.orientation.index(axs)
+            args.orientation[ind] = axs*-1
+    args.orientation = tuple(args.orientation)
+            
+    # args.background640 = (10,10)
+    # args.cellshape640 = 500
+    # args.maximashape640 = 5
+    # args.background561 = None
+    # args.cellshape561 = 2600
+    # args.maximashape561 = 10
     if not os.path.exists(args.dst): os.mkdir(args.dst)
     
     return args
@@ -281,29 +301,29 @@ if __name__ == "__main__":
   resample_parameter = {
         "source_resolution" : (1.26, 1.26, args.zstep), #z step might be 5 because less z planes
         "sink_resolution"   : (25,25,25),
-        "orientation": args.orientation, #inverts old z (dorsal -> ventral) and flips x and z
+        "orientation": tuple(args.orientation), #inverts old z (dorsal -> ventral) and flips x and z
         "processes" : None,
         "verbose" : True,             
         };
   #mod because of server priviledge issues
   sink_ch1 = os.path.join(args.dst, args.brainname+"_{}_resampled.tif".format(args.channel1))   
-  res.resample(ws.source("ch1"), sink=sink_ch1, **resample_parameter) 
+  # res.resample(ws.source("ch1"), sink=sink_ch1, **resample_parameter) 
   if isinstance(args.channel2,int):
       sink_ch2 = os.path.join(args.dst, args.brainname+"_{}_resampled.tif".format(args.channel2))   
-      res.resample(ws.source("ch2"), sink=sink_ch2, **resample_parameter) 
+      # res.resample(ws.source("ch2"), sink=sink_ch2, **resample_parameter) 
 
   #%% Resample autofluorescence
       
   resample_parameter_auto = {
         "source_resolution" : (1.26, 1.26, args.zstep), #z step might be 5 because less z planes
         "sink_resolution"   : (25,25,25),
-        "orientation": args.orientation, #inverts old z (dorsal -> ventral) and flips x and z
+        "orientation": tuple(args.orientation), #inverts old z (dorsal -> ventral) and flips x and z
         "processes" : None,
         "verbose" : True,             
         };    
   #mod because of server priviledge issues
   sink_auto = os.path.join(args.dst, args.brainname+"_auto_resampled.tif")   
-  res.resample(ws.filename("autofluorescence"), sink=sink_auto, **resample_parameter_auto) 
+  # res.resample(ws.filename("autofluorescence"), sink=sink_auto, **resample_parameter_auto) 
   # ws.update(resampled = sink_auto, resampled_to_auto_ch1 = sink_ch1)
   # if isinstance(args.channel2,int):
       # ws.update(resampled_to_auto_ch2 = sink_ch2)
@@ -322,7 +342,7 @@ if __name__ == "__main__":
        "result_directory" :  os.path.join(args.dst, args.brainname+"_elastix_resampled_to_auto_ch1" )
        }; 
   
-  elx.align(**align_channels_parameter);
+  # elx.align(**align_channels_parameter);
   
   if isinstance(args.channel2,int):
       # align the two channels
@@ -338,7 +358,7 @@ if __name__ == "__main__":
           "result_directory" :  os.path.join(args.dst, args.brainname+"_elastix_resampled_to_auto_ch2" )
           }; 
       
-      elx.align(**align_channels_parameter);
+      # elx.align(**align_channels_parameter);
   
   
   #%% Alignment - autoflourescence to reference
@@ -356,7 +376,7 @@ if __name__ == "__main__":
        "result_directory" :  os.path.join(args.dst, args.brainname+"_elastix_auto_to_reference")
        };
   
-  elx.align(**align_reference_parameter);
+  # elx.align(**align_reference_parameter);
   
 
   #%%############################################################################
@@ -365,24 +385,16 @@ if __name__ == "__main__":
   
   #%% Cell detection:
   
-   #channel 1
-  if args.channel1 == 640:
-      background = args.background640
-      cellshape = args.cellshape640
-      maximashape = args.maximashape640
-  elif args.channel1 == 561:
-      background = args.background561
-      cellshape = args.cellshape561
-      maximashape = args.maximashape561
-      
+   #channel 1      
   cell_detection_parameter = cells.default_cell_detection_parameter.copy();
   cell_detection_parameter["illumination_correction"] = None;
-  if background is not None: 
-      cell_detection_parameter["background_correction"] = {"shape": background, "form": "Disk"}; 
-  else: cell_detection_parameter["background_correction"] = background
+  if args.backgroundparamch1 is not None: 
+      cell_detection_parameter["background_correction"] = {"shape": (args.backgroundparamch1,args.backgroundparamch1),
+                                                           "form": "Disk"}; 
+  else: cell_detection_parameter["background_correction"] = args.backgroundparamch1
   cell_detection_parameter["intensity_detection"]["measure"] = ["source"];
-  cell_detection_parameter["shape_detection"]["threshold"] = cellshape #for 640 ch 500
-  cell_detection_parameter["maxima_detection"]["shape"] = maximashape
+  cell_detection_parameter["shape_detection"]["threshold"] = args.cellshapech1 #for 640 ch 500
+  cell_detection_parameter["maxima_detection"]["shape"] = args.maximashapech1
 
   processing_parameter = cells.default_cell_detection_processing_parameter.copy();
   processing_parameter.update(
@@ -400,24 +412,16 @@ if __name__ == "__main__":
                        cell_detection_parameter=cell_detection_parameter, 
                        processing_parameter=processing_parameter)
   
-  #channel 2
-  if args.channel2 == 640:
-      background = args.background640
-      cellshape = args.cellshape640
-      maximashape = args.maximashape640
-  elif args.channel2 == 561:
-      background = args.background561
-      cellshape = args.cellshape561
-      maximashape = args.maximashape561
-      
+  #channel 2      
   cell_detection_parameter = cells.default_cell_detection_parameter.copy();
   cell_detection_parameter["illumination_correction"] = None;
-  if background is not None: 
-      cell_detection_parameter["background_correction"] = {"shape": background, "form": "Disk"}; 
-  else: cell_detection_parameter["background_correction"] = background
+  if args.backgroundparamch2 is not None: 
+      cell_detection_parameter["background_correction"] = {"shape": (args.backgroundparamch2,args.backgroundparamch2), 
+                                                           "form": "Disk"}; 
+  else: cell_detection_parameter["background_correction"] = args.backgroundparamch2
   cell_detection_parameter["intensity_detection"]["measure"] = ["source"];
-  cell_detection_parameter["shape_detection"]["threshold"] = cellshape #for 640 ch 500
-  cell_detection_parameter["maxima_detection"]["shape"] = maximashape
+  cell_detection_parameter["shape_detection"]["threshold"] = args.cellshapech2 #for 640 ch 500
+  cell_detection_parameter["maxima_detection"]["shape"] = args.maximashapech2
 
   processing_parameter = cells.default_cell_detection_processing_parameter.copy();
   processing_parameter.update(
@@ -466,7 +470,7 @@ if __name__ == "__main__":
        downsized = tif.imread(sink_ch1) #sagittal
        zd,yd,xd = downsized.shape #sagittal
        #reorient pnts
-       pnts_sag = np.array([[xx[2],xx[1],xx[0]] for xx in pnts]) #from xyz
+       pnts_sag = np.array([[xx[2],xx[1],xx[0]] for xx in pnts]) 
        #get full size dims
        stitched = os.path.join(directory, "{0}_{1}".format(args.brainname, channel))
        y,z = tif.imread(os.path.join(stitched, os.listdir(stitched)[56])).shape #sagittal
@@ -479,7 +483,9 @@ if __name__ == "__main__":
            z,y,x=pnt
            cell[z,y,x] = 1
        #flip x and y
-       cell_oriented = np.flip(cell, axis=0)    
+       #get axes to flip from clearmap format
+       newax = [xx-1 for xx in args.flipax] #convert to 0 index
+       cell_oriented = np.flip(cell, tuple(newax))    
        #get coordinates again
        downsized_pnts_sag_oriented = np.nonzero(cell_oriented)
        downsized_pnts_sag_oriented = np.array([downsized_pnts_sag_oriented[0],downsized_pnts_sag_oriented[1],downsized_pnts_sag_oriented[2]]).T
